@@ -1,159 +1,190 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F1 Reflex Testi</title>
-    <style>
-        /* CSS Başlangıcı */
-        body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #000000;
-            color: #ffffff;
-            font-family: 'Arial Black', sans-serif;
-            user-select: none;
-            cursor: pointer;
-            transition: background-color 0.5s;
-        }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>F1 Reflex Testi</title>
+<style>
+:root{
+    --bg: #000;
+    --accent: #ff0000;
+    --text: #eaeaea;
+    --glass: rgba(255,255,255,0.03);
+}
 
-        /* Yeni Buton ve Konumlandırma */
-        #history-button {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            padding: 10px 15px;
-            background-color: #ff0000;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.9em;
-            font-weight: bold;
-            z-index: 100;
-            transition: background-color 0.2s;
-        }
+/* Genel stil */
+html,body{ height:100%; margin:0; padding:0; }
+body{
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    user-select:none;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+}
 
-        #history-button:hover {
-            background-color: #670000;
-        }
+/* Oyun alanı */
+#game-area {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    height:100vh;
+    padding:24px;
+    box-sizing:border-box;
+}
 
-        /* Geçmiş Görüntüleme Modalı */
-        #history-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.9);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 200;
-        }
+#lights-container { display:flex; gap:14px; margin-bottom:20px; }
+.light{
+    width:80px; height:80px;
+    border-radius:50%;
+    background:#111;
+    border:4px solid var(--accent);
+    box-shadow: 0 0 4px var(--accent);
+    transition: all 0.12s ease;
+}
+.light.on{
+    background: var(--accent);
+    box-shadow:
+        0 0 6px var(--accent),
+        0 0 12px var(--accent),
+        0 0 18px var(--accent),
+        0 0 24px var(--accent);
+}
 
-        #history-content {
-            background-color: #000000;
-            padding: 30px;
-            border-radius: 10px;
-            width: 80%;
-            max-width: 400px;
-            max-height: 80%;
-            overflow-y: auto;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-        }
+#status-display{
+    font-family:'Arial Black',sans-serif;
+    font-size:1.8em;
+    font-weight:900;
+    text-align:center;
+    color:#ccc;
+}
 
-        #history-content h3 {
-            margin-top: 0;
-            border-bottom: 2px solid #000000;
-            padding-bottom: 10px;
-            color: #ff0000;
-        }
+#reaction-time{
+    font-family:'Arial Black',sans-serif;
+    font-size:3.5em;
+    font-weight:900;
+    color: var(--accent);
+    text-shadow:0 0 5px var(--accent);
+}
 
-        #history-list {
-            list-style: none;
-            padding: 0;
-        }
+/* History button */
+#history-button{
+    position:fixed; left:20px; top:20px;
+    background:linear-gradient(180deg,#ff4b4b,#ff1720);
+    color:white; border:none; padding:10px 14px; border-radius:10px;
+    box-shadow:0 8px 24px rgba(255,20,20,0.12);
+    font-weight:800; cursor:pointer; z-index:60;
+}
+#history-button:active{ transform:translateY(1px); }
 
-        #history-list li {
-            padding: 8px 0;
-            border-bottom: 1px solid #000000;
-            display: flex;
-            justify-content: space-between;
-            font-family: monospace;
-            font-size: 1.1em;
-        }
+/* History sayfası */
+#history-page{
+    position:fixed; inset:0;
+    background:#121212;
+    display:none;
+    opacity:0;
+    flex-direction:column;
+    z-index:200;
+    color:var(--text);
+    transition: opacity 0.3s ease;
+}
 
-        #history-list li:last-child {
-            border-bottom: none;
-        }
+#history-page.active{
+    display:flex;
+    opacity:1;
+}
 
-        .best-time {
-            color: rgb(255, 0, 0);
-            font-weight: bold;
-        }
+.hist-top{
+    display:flex; align-items:center; gap:12px;
+    padding:18px 22px;
+    border-bottom:1px solid rgba(255,255,255,0.1);
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    z-index:2;
+}
+.hist-title{ font-weight:900; color:var(--accent); font-size:20px; }
+.hist-actions{ margin-left:auto; display:flex; gap:10px; align-items:center; }
+.btn{
+    padding:10px 14px; border-radius:10px; border:none; cursor:pointer;
+    font-weight:700; background:transparent; color:var(--text);
+    box-shadow:inset 0 -2px 0 rgba(255,255,255,0.02);
+}
+.btn.ghost{ border:1px solid rgba(255,255,255,0.05); }
+.btn.primary{
+    background: linear-gradient(180deg, #ff0000, #ff0000);
+    color:white; box-shadow:0 10px 30px rgba(255,30,30,0.12);
+}
+.btn.danger{
+    background: linear-gradient(180deg, #3b3b3b, #2a2a2a);
+    border:1px solid rgba(255,255,255,0.04);
+    color:#ffb3b3;
+}
+.btn:active{ transform:translateY(1px); }
 
-        .close-button {
-            float: right;
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #ffffff;
-            cursor: pointer;
-        }
-        .close-button:hover {
-            color: white;
-        }
-        /* Diğer elementlerin stilleri aynı kalır */
-        #lights-container {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 30px;
-        }
+#history-body{
+    flex:1;
+    overflow-y:auto; /* scrollable */
+    padding:22px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+}
+.history-table{
+    width:100%;
+    max-width:1100px;
+    margin:0 auto;
+    border-collapse:collapse;
+    background: rgba(255,255,255,0.02);
+    border-radius:10px;
+    font-family: monospace;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    overflow:hidden;
+}
+.history-table thead th{
+    text-align:left;
+    padding:12px 14px;
+    font-size:14px;
+    color:#ddd;
+    font-weight:800;
+    background: rgba(0, 0, 0, 0.1);
+}
+.history-table tbody td{
+    padding:12px 14px;
+    border-bottom:1px solid rgba(0, 0, 0, 0.05);
+    color:#cfcfcf;
+    font-size:15px;
+}
+.history-table tbody tr:nth-child(1) td{
+    color:var(--accent);
+    font-weight:900;
+}
+.muted{ color:#9a9a9a; font-weight:600; font-size:13px; text-align:center; }
 
-        .light {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background-color: #333;
-            border: 4px solid #ff0000;
-            transition: background-color 0.1s, box-shadow 0.1s;
-        }
+/* Grafik alanı */
+#chart-container{
+    max-width:1100px;
+    margin:0 auto;
+    padding:12px;
+    background: #00000007;
+    border-radius:10px;
+    box-shadow:0 0 20px rgba(0, 0, 0, 0.436);
+}
+canvas{ width:100% !important; height:250px !important; }
 
-        .light.on {
-            background-color: #cc0000;
-            box-shadow: 0 0 15px #ff4444, 0 0 30px #ff0000;
-        }
-
-        #status-display {
-            font-size: 1.8em;
-            font-weight: 900;
-            text-align: center;
-            min-height: 50px;
-            color: #ccc;
-        }
-
-        #reaction-time {
-            font-size: 3.5em;
-            color: #ff0000;
-            font-weight: 900;
-            margin-top: 20px;
-            text-shadow: 0 0 5px #ff0000;
-        }
-
-        .error {
-            color: #ff0000 !important;
-        }
-        /* CSS Bitişi */
-    </style>
+@media (max-width:800px){
+    .history-table thead th:nth-child(3),
+    .history-table tbody td:nth-child(3){ display:none; }
+    #reaction-time{ font-size:30px; }
+    .light{ width:48px; height:48px; }
+}
+</style>
 </head>
 <body>
 
-    <button id="history-button">Zaman Geçmişimiz</button>
+<button id="history-button">Zaman Geçmişimiz</button>
 
+<div id="game-area">
     <div id="lights-container">
         <div class="light"></div>
         <div class="light"></div>
@@ -161,202 +192,184 @@
         <div class="light"></div>
         <div class="light"></div>
     </div>
-
-    <div id="status-display">Yarışa başlamak için herhangi bir yere **tıklayın** (veya dokunun).</div>
-
+    <div id="status-display">Yarışa başlamak için tıklayın.</div>
     <div id="reaction-time">0.000 s</div>
+</div>
 
-    <div id="history-modal">
-        <div id="history-content">
-            <span class="close-button" onclick="document.getElementById('history-modal').style.display = 'none';">&times;</span>
-            <h3>🏁 Reaksiyon Süresi Geçmişi</h3>
-            <ul id="history-list">
-                </ul>
+<div id="history-page" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="hist-top">
+        <div class="hist-title">🏁 Zaman Geçmişi</div>
+        <div class="hist-actions">
+            <button id="close-history" class="btn ghost">← GERİ</button>
+            <button id="export-button" class="btn primary">Dışa Aktar</button>
+            <button id="clear-button" class="btn danger">Temizle</button>
         </div>
     </div>
-    
-    <audio id="light-sound" src="light.mp3" preload="auto"></audio>
-    <audio id="go-sound" src="go_sound.mp3" preload="auto"></audio>
+    <div id="history-body">
+        <table class="history-table">
+            <thead>
+                <tr><th>#</th><th>Zaman (s)</th><th>Tarih - Saat</th></tr>
+            </thead>
+            <tbody id="history-tbody"></tbody>
+        </table>
+        <div id="no-records" class="muted" style="display:none;">Henüz kaydedilmiş bir reaksiyon süreniz yok.</div>
+        <div id="chart-container"><canvas id="history-chart"></canvas></div>
+    </div>
+</div>
 
-    <script>
-        // JavaScript Başlangıcı
-        const lights = document.querySelectorAll('.light');
-        const statusDisplay = document.getElementById('status-display');
-        const reactionTimeDisplay = document.getElementById('reaction-time');
-        const totalLights = lights.length;
-        const historyButton = document.getElementById('history-button');
-        const historyModal = document.getElementById('history-modal');
-        const historyList = document.getElementById('history-list');
+<audio id="light-sound" src="light.mp3" preload="auto"></audio>
+<audio id="go-sound" src="go_sound.mp3" preload="auto"></audio>
 
-        // YENİ: Ses elementlerini seçme
-        const lightSound = document.getElementById('light-sound');
-        const goSound = document.getElementById('go-sound');
+<script>
+// Oyun ve history değişkenleri
+const lights=document.querySelectorAll('.light');
+const statusDisplay=document.getElementById('status-display');
+const reactionTimeDisplay=document.getElementById('reaction-time');
 
+const historyButton=document.getElementById('history-button');
+const historyPage=document.getElementById('history-page');
+const closeHistory=document.getElementById('close-history');
+const exportButton=document.getElementById('export-button');
+const clearButton=document.getElementById('clear-button');
+const historyTbody=document.getElementById('history-tbody');
+const noRecords=document.getElementById('no-records');
+const chartCanvas=document.getElementById('history-chart');
 
-        let state = 'ready';
-        let startTime = 0;
-        let lightsOutTimeout = null;
-        let reactionHistory = [];
+let state='ready';
+let startTime=0;
+let lightsOutTimeout=null;
+let reactionHistory=[];
 
-        // --- Geçmiş Fonksiyonları ---
+function uid(){ return 'id'+Math.random().toString(36).slice(2,9); }
+function fmtDate(iso){ const d=new Date(iso); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
 
-        function loadHistory() {
-            const historyJSON = localStorage.getItem('f1ReactionHistory');
-            if (historyJSON) {
-                reactionHistory = JSON.parse(historyJSON);
-                // En iyi sürenin en üstte olmasını sağlamak için küçükten büyüğe sırala
-                reactionHistory.sort((a, b) => a - b);
-            }
-        }
+function loadHistory(){
+    const raw=localStorage.getItem('f1ReactionHistory');
+    if(!raw){ reactionHistory=[]; return; }
+    try{
+        const parsed=JSON.parse(raw);
+        reactionHistory=parsed.map(item=>({
+            time:Number(item.time||item),
+            date:item.date||new Date().toISOString(),
+            id:item.id||uid()
+        }));
+        reactionHistory.sort((a,b)=>a.time-b.time);
+    }catch(e){ reactionHistory=[]; }
+}
+function persistHistory(){ localStorage.setItem('f1ReactionHistory', JSON.stringify(reactionHistory)); }
 
-        function saveReaction(time) {
-            // Sadece başarılı reaksiyonları (0.000 s'den büyük) kaydet
-            if (time > 0) {
-                reactionHistory.push(time);
-                // En iyi sürenin en üstte olması için tekrar sırala
-                reactionHistory.sort((a, b) => a - b);
-                // Sadece son 120 reaksiyonu tutmak isteyebiliriz
-                if (reactionHistory.length > 120) {
-                    reactionHistory = reactionHistory.slice(0, 120);
-                }
-                localStorage.setItem('f1ReactionHistory', JSON.stringify(reactionHistory));
-            }
-        }
+function renderHistoryTable(){
+    historyTbody.innerHTML='';
+    if(reactionHistory.length===0){ noRecords.style.display='block'; drawChart(); return; }
+    else noRecords.style.display='none';
+    reactionHistory.forEach((rec,i)=>{
+        const tr=document.createElement('tr');
+        const tdRank=document.createElement('td');
+        tdRank.textContent=i===0?'🥇':(i+1); tdRank.style.fontWeight=i===0?'900':'700';
+        const tdTime=document.createElement('td'); tdTime.textContent=rec.time.toFixed(3);
+        const tdDate=document.createElement('td'); tdDate.textContent=fmtDate(rec.date);
+        tr.appendChild(tdRank); tr.appendChild(tdTime); tr.appendChild(tdDate);
+        historyTbody.appendChild(tr);
+    });
+    drawChart();
+}
 
-        function displayHistory() {
-            historyList.innerHTML = ''; // Listeyi temizle
-            
-            if (reactionHistory.length === 0) {
-                historyList.innerHTML = '<li>Henüz kaydedilmiş bir reaksiyon süreniz yok.</li>';
-            } else {
-                reactionHistory.forEach((time, index) => {
-                    const listItem = document.createElement('li');
-                    const timeString = time.toFixed(3) + ' s';
-                    
-                    // En iyi reaksiyon süresini işaretle
-                    if (index === 0) {
-                        listItem.innerHTML = `<span>🥇 EN İYİ:</span> <span class="best-time">${timeString}</span>`;
-                    } else {
-                        listItem.innerHTML = `<span>#${index + 1}:</span> <span>${timeString}</span>`;
-                    }
-                    historyList.appendChild(listItem);
-                });
-            }
-            historyModal.style.display = 'flex'; // Modalı göster
-        }
+function openHistory(){ renderHistoryTable(); historyPage.classList.add('active'); historyPage.setAttribute('aria-hidden','false'); historyPage.scrollTop=0; setTimeout(()=>closeHistory.focus(),50);}
+function closeHistoryPage(){ historyPage.classList.remove('active'); historyPage.setAttribute('aria-hidden','true'); }
 
-        // --- Mevcut Oyun Fonksiyonları Güncellemeleri ---
-        
-        document.body.addEventListener('click', handleClick);
-        document.body.addEventListener('touchstart', handleClick);
-        historyButton.addEventListener('click', (e) => {
-            e.stopPropagation(); // Tıklamanın body'ye yayılmasını engeller
-            displayHistory();
-        });
+function exportHistory(){
+    if(reactionHistory.length===0){ alert('Dışa aktarılacak kayıt yok.'); return; }
+    const text=reactionHistory.map((r,i)=>`${i===0?'🥇 EN İYİ':`#${i+1}`}: ${r.time.toFixed(3)} s — ${fmtDate(r.date)}`).join('\n');
+    navigator.clipboard?.writeText(text).then(()=>alert('Geçmiş panoya kopyalandı.'));
+}
+function clearHistory(){ if(confirm('Geçmişi tamamen silmek istediğinize emin misiniz?')){ reactionHistory=[]; persistHistory(); renderHistoryTable(); }}
 
-        // Modal dışına tıklayınca kapatma
-        historyModal.addEventListener('click', (e) => {
-            if (e.target === historyModal) {
-                historyModal.style.display = 'none';
-            }
-        });
+// Oyun işlemleri
+document.body.addEventListener('click', handleClick);
+document.body.addEventListener('touchstart', handleClick,{passive:false});
 
+function resetGame(){ lights.forEach(l=>l.classList.remove('on')); statusDisplay.textContent='Yarışa başlamak için tıklayın.'; reactionTimeDisplay.textContent='0.000 s'; state='ready'; clearTimeout(lightsOutTimeout); }
 
-        function resetGame() {
-            lights.forEach(light => light.classList.remove('on'));
-            statusDisplay.textContent = 'Yarışa başlamak için herhangi bir yere **tıklayın** (veya dokunun).';
-            statusDisplay.classList.remove('error');
-            reactionTimeDisplay.textContent = '0.000 s';
-            state = 'ready';
-            clearTimeout(lightsOutTimeout);
-        }
+function handleClick(e){
+    if(e.type==='touchstart') e.preventDefault();
+    if(historyPage.classList.contains('active')) return;
+    if(e.target===historyButton || historyButton.contains(e.target)) return;
+    if(state==='ready'){ startSequence(); }
+    else if(state==='waiting'){
+        clearTimeout(lightsOutTimeout); lights.forEach(l=>l.classList.add('on'));
+        statusDisplay.textContent='HATA! Çok erken başladınız.'; reactionTimeDisplay.textContent='Çok Erken'; state='complete';
+    }else if(state==='running'){
+        const stop=performance.now();
+        const reaction=(stop-startTime)/1000;
+        reactionHistory.push({time:Number(reaction), date:new Date().toISOString(), id:uid()});
+        reactionHistory.sort((a,b)=>a.time-b.time);
+        if(reactionHistory.length>120) reactionHistory=reactionHistory.slice(0,120);
+        persistHistory();
+        statusDisplay.textContent='REAKSİYON SÜRENİZ:'; reactionTimeDisplay.textContent=reaction.toFixed(3)+' s'; state='complete';
+    }else if(state==='complete'){ resetGame(); }
+}
 
-        function handleClick(event) {
-            if (event.type === 'touchstart') {
-                event.preventDefault();
-            }
-            // Eğer geçmiş modalı açıksa, oyuna değil moda tıklandı demektir.
-            if (historyModal.style.display === 'flex') {
-                return; 
-            }
+function startSequence(){
+    state='waiting'; statusDisplay.textContent='BEKLEYİN...'; reactionTimeDisplay.textContent='0.000 s'; lights.forEach(l=>l.classList.remove('on'));
+    let idx=0; const interval=900;
+    function next(){
+        if(idx<lights.length){ lights[idx].classList.add('on'); idx++; setTimeout(next,interval); }
+        else{ lightsOutTimeout=setTimeout(lightsOut,Math.random()*2500+1000); }
+    }
+    next();
+}
+function lightsOut(){ lights.forEach(l=>l.classList.remove('on')); statusDisplay.textContent='GİT! 🚦'; state='running'; startTime=performance.now(); }
 
-            if (state === 'ready') {
-                startSequence();
-            } else if (state === 'waiting') {
-                // Hatalı Başlangıç (False Start)
-                clearTimeout(lightsOutTimeout);
-                
-                // YENİ: Hatalı başlangıçta ışık sesini durdur
-                lightSound.pause();
-                lightSound.currentTime = 0;
+function drawChart(){
+    if(!chartCanvas) return;
+    const ctx=chartCanvas.getContext('2d');
+    const data=reactionHistory.map(r=>r.time.toFixed(3));
+    ctx.clearRect(0,0,chartCanvas.width,chartCanvas.height);
+    if(data.length<1) return;
+    const padding=30; const w=chartCanvas.width; const h=chartCanvas.height;
+    const maxVal=Math.max(...data,0.5);
+    const minVal=Math.min(...data,0.1);
 
-                lights.forEach(light => light.classList.add('on'));
-                statusDisplay.textContent = 'HATA! Çok erken başladınız. Tekrar denemek için tıklayın.';
-                statusDisplay.classList.add('error');
-                reactionTimeDisplay.textContent = 'Çok Erken';
-                state = 'complete';
-            } else if (state === 'running') {
-                // Işıklar söndüğünde tıklandı (Reaksiyon zamanı ölçülür)
-                const stopTime = performance.now();
-                const reactionTime = (stopTime - startTime) / 1000;
-                
-                // YENİ: Başarılı süreyi kaydet
-                saveReaction(reactionTime); 
+    // Çizgi
+    ctx.beginPath();
+    data.forEach((val,i)=>{
+        const x=padding+(i/(data.length-1))*(w-padding*2);
+        const y=h-padding-(val/maxVal)*(h-padding*2);
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.strokeStyle='#ff0000'; ctx.lineWidth=2; ctx.stroke();
 
-                statusDisplay.textContent = 'REAKSİYON SÜRENİZ:';
-                statusDisplay.classList.remove('error');
-                reactionTimeDisplay.textContent = reactionTime.toFixed(3) + ' s';
-                state = 'complete';
-            } else if (state === 'complete') {
-                resetGame();
-            }
-        }
+    // Noktalar renk
+    data.forEach((val,i)=>{
+        const x=padding+(i/(data.length-1))*(w-padding*2);
+        const y=h-padding-(val/maxVal)*(h-padding*2);
+        let color='#ffff00';
+        if(val<=minVal+0.2) color='#22c55e';
+        else if(val>=maxVal-0.2) color='#ff0000';
+        ctx.fillStyle=color;
+        ctx.beginPath(); ctx.arc(x,y,5,0,2*Math.PI); ctx.fill();
+    });
 
-        function startSequence() {
-            state = 'waiting';
-            statusDisplay.textContent = 'BEKLEYİN...';
-            reactionTimeDisplay.textContent = '0.000 s';
-            lights.forEach(light => light.classList.remove('on'));
+    // Y ekseni çizgileri
+    ctx.strokeStyle='rgba(255,255,255,0.2)';
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    for(let i=0;i<=5;i++){
+        const y=padding+i*(h-2*padding)/5;
+        ctx.moveTo(padding,y); ctx.lineTo(w-padding,y);
+    }
+    ctx.stroke();
+}
 
-            let lightIndex = 0;
-            const lightInterval = 900; 
+// Event listenerler
+historyButton.addEventListener('click',(e)=>{ e.stopPropagation(); loadHistory(); renderHistoryTable(); openHistory(); });
+closeHistory.addEventListener('click',(e)=>{ e.stopPropagation(); closeHistoryPage(); });
+exportButton.addEventListener('click',(e)=>{ e.stopPropagation(); exportHistory(); });
+clearButton.addEventListener('click',(e)=>{ e.stopPropagation(); clearHistory(); });
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && historyPage.classList.contains('active')) closeHistoryPage(); });
 
-            function turnOnNextLight() {
-                if (lightIndex < totalLights) {
-                    lights[lightIndex].classList.add('on');
-                    
-                    // YENİ: Işık yanarken ses çal
-                    lightSound.currentTime = 0; // Sesi baştan başlat
-                    // Sesin çalmasını deniyoruz, hata olursa konsola yazar (örn. tarayıcı kısıtlamaları)
-                    lightSound.play().catch(e => console.log("Ses çalma hatası:", e)); 
-                    
-                    lightIndex++;
-                    setTimeout(turnOnNextLight, lightInterval);
-                } else {
-                    const randomDelay = Math.random() * 2500 + 1000;
-                    lightsOutTimeout = setTimeout(lightsOut, randomDelay);
-                }
-            }
-
-            turnOnNextLight();
-        }
-
-        function lightsOut() {
-            lights.forEach(light => light.classList.remove('on'));
-            statusDisplay.textContent = 'GİT! 🚦';
-            statusDisplay.classList.remove('error');
-            startTime = performance.now();
-            state = 'running';
-            
-            // YENİ: Işıklar söndüğünde GO sesini çal
-            goSound.currentTime = 0; // Sesi baştan başlat
-            goSound.play().catch(e => console.log("GO sesi çalma hatası:", e));
-        }
-
-        // Başlangıçta geçmişi yükle
-        loadHistory();
-        resetGame();
-        // JavaScript Bitişi
-    </script>
+loadHistory();
+resetGame();
+</script>
 </body>
 </html>
