@@ -1,0 +1,8 @@
+body {
+	background-color: black;
+	color: white;
+	margin: 0;
+	min-height: 100vh;
+}
+
+/* Eğer sadece arkaplanı siyah yapmak istiyorsanız, üstteki `color` satırını kaldırabilirsiniz. */

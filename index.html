@@ -1,0 +1,814 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>F1 Reflex Testi</title>
+<style>
+:root{
+    --bg: #000;
+    --accent: #ff0000;
+    --text: #eaeaea;
+    --glass: rgba(255,255,255,0.03);
+    --chart-bg: rgba(255,255,255,0.02);
+    --chart-grid: rgba(255,255,255,0.04);
+}
+
+/* Genel stil */
+html,body{ height:100%; margin:0; padding:0; background:var(--bg); }
+body{
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    user-select:none;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+}
+
+/* --- SNOW CANVAS --- */
+#snow-canvas{
+    position:fixed;
+    inset:0;
+    width:100%;
+    height:100%;
+    z-index:-1; /* arkada kalsın */
+    pointer-events:none; /* tıklamaları geçsin */
+    display:block;
+    mix-blend-mode:screen;
+    opacity:0.95;
+}
+
+/* Oyun alanı */
+#game-area {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    height:100vh;
+    padding:24px;
+    box-sizing:border-box;
+    position:relative;
+    z-index:1; /* canvas'ın üzerinde olsun */
+}
+
+/* ışık konteyneri - merkezi */
+#lights-container { 
+    display:flex; 
+    gap:14px; 
+    margin-bottom:20px; 
+    position:relative; /* edge anim için gerekli (ancak anim'ler fixed) */
+    align-items:center;
+    justify-content:center;
+    padding:24px 12px;
+    overflow:visible;
+}
+.light{
+    width:80px; height:80px;
+    border-radius:50%;
+    background:#111;
+    border:4px solid var(--accent);
+    box-shadow: 0 0 4px var(--accent);
+    transition: all 0.12s ease;
+}
+.light.on{
+    background: var(--accent);
+    box-shadow:
+        0 0 6px var(--accent),
+        0 0 12px var(--accent),
+        0 0 18px var(--accent),
+        0 0 24px var(--accent);
+}
+
+/* Üst ve alt kenar animasyonları
+   - position: fixed yapıldı ki ekranın tam üstü/altında gözüksün
+   - top için animasyon aşağıdan yukarıya gelir (üst kısım için alt kısımdan gelen)
+   - bottom için animasyon yukarıdan aşağıya gelir (alt kısım için üst kısımdan gelen)
+*/
+.edge-anim{
+    position:fixed;
+    left:50%;
+    transform:translateX(-50%);
+    width:90%;
+    max-width:1200px;
+    height:36px;
+    border-radius:18px;
+    pointer-events:none;
+    opacity:0;
+    z-index:9999;
+    mix-blend-mode:screen;
+    filter:blur(6px);
+    display:block;
+    will-change: transform, opacity;
+}
+/* bar: parlak kırmızı yoğun efekt */
+.edge-anim .bar{
+    width:100%;
+    height:100%;
+    background: linear-gradient(90deg,
+        rgba(255,0,0,0.04),
+        rgba(255,30,30,0.96),
+        rgba(255,0,0,0.04)
+    );
+    border-radius:inherit;
+    opacity:0.95;
+    box-shadow: 0 6px 40px rgba(255,0,0,0.14), inset 0 -8px 40px rgba(255,0,0,0.06);
+}
+
+/* top: ekranın en üstünde (ancak animasyon aşağıdan yukarıya doğru hareket eder) */
+.edge-anim.top{
+    top:8px;
+    transform-origin:center top;
+}
+/* hareket: başlangıçta aşağıdandır, sonra yukarı kayar */
+@keyframes topWave {
+    0%{ transform: translateX(-50%) translateY(80px) scaleY(0.6); opacity:0; }
+    18%{ transform: translateX(-50%) translateY(28px) scaleY(0.9); opacity:0.95; }
+    55%{ transform: translateX(-50%) translateY(-6px) scaleY(1); opacity:0.75; }
+    100%{ transform: translateX(-50%) translateY(-88px) scaleY(0.55); opacity:0; }
+}
+.edge-anim.top.animate{ animation: topWave 620ms cubic-bezier(.16,.84,.44,1); }
+
+/* bottom: ekranın en altında (animasyon yukarıdan aşağıya gelir) */
+.edge-anim.bottom{
+    bottom:8px;
+    transform-origin:center bottom;
+}
+@keyframes bottomWave {
+    0%{ transform: translateX(-50%) translateY(-80px) scaleY(0.6); opacity:0; }
+    18%{ transform: translateX(-50%) translateY(-28px) scaleY(0.9); opacity:0.95; }
+    55%{ transform: translateX(-50%) translateY(6px) scaleY(1); opacity:0.75; }
+    100%{ transform: translateX(-50%) translateY(88px) scaleY(0.55); opacity:0; }
+}
+.edge-anim.bottom.animate{ animation: bottomWave 620ms cubic-bezier(.16,.84,.44,1); }
+
+#status-display{
+    font-family:'Arial Black',sans-serif;
+    font-size:1.8em;
+    font-weight:900;
+    text-align:center;
+    color:#ccc;
+}
+
+#reaction-time{
+    font-family:'Arial Black',sans-serif;
+    font-size:3.5em;
+    font-weight:900;
+    color: var(--accent);
+    text-shadow:0 0 5px var(--accent);
+}
+
+/* History button */
+#history-button{
+    position:fixed; left:20px; top:20px;
+    background:linear-gradient(180deg,#ff4b4b,#ff1720);
+    color:white; border:none; padding:10px 14px; border-radius:10px;
+    box-shadow:0 8px 24px rgba(255,20,20,0.12);
+    font-weight:800; cursor:pointer; z-index:60;
+}
+#history-button:active{ transform:translateY(1px); }
+
+#history-page{
+    position:fixed; inset:0;
+    background:#121212;
+    display:none;
+    opacity:0;
+    flex-direction:column;
+    z-index:200;
+    color:var(--text);
+    transition: opacity 0.3s ease;
+}
+
+#history-page.active{
+    display:flex;
+    opacity:1;
+}
+
+.hist-top{
+    display:flex; align-items:center; gap:12px;
+    padding:18px 22px;
+    border-bottom:1px solid rgba(255,255,255,0.1);
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    z-index:2;
+}
+.hist-title{ font-weight:900; color:var(--accent); font-size:20px; }
+.hist-actions{ margin-left:auto; display:flex; gap:10px; align-items:center; }
+.btn{
+    padding:10px 14px; border-radius:10px; border:none; cursor:pointer;
+    font-weight:700; background:transparent; color:var(--text);
+    box-shadow:inset 0 -2px 0 rgba(255,255,255,0.02);
+}
+.btn.ghost{ border:1px solid rgba(255,255,255,0.05); }
+.btn.primary{
+    background: linear-gradient(180deg, #ff0000, #ff0000);
+    color:white; box-shadow:0 10px 30px rgba(255,30,30,0.12);
+}
+.btn.danger{
+    background: linear-gradient(180deg, #3b3b3b, #2a2a2a);
+    border:1px solid rgba(255,255,255,0.04);
+    color:#ffb3b3;
+}
+.btn:active{ transform:translateY(1px); }
+
+#history-body{
+    flex:1;
+    overflow-y:auto; /* scrollable */
+    padding:22px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+}
+
+/* Chart container */
+#chart-wrap{
+    width:100%;
+    max-width:1100px;
+    margin:0 auto;
+    background: var(--chart-bg);
+    border-radius:10px;
+    padding:14px;
+    box-shadow: 0 6px 30px rgba(0,0,0,0.4);
+    box-sizing:border-box;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+.chart-title{
+    font-weight:800;
+    color:var(--accent);
+    font-family: monospace;
+    font-size:14px;
+}
+#chart-canvas{
+    width:100%;
+    height:300px;
+    background: transparent;
+    border-radius:8px;
+    position:relative;
+}
+
+/* Table */
+.history-table{
+    width:100%;
+    max-width:1100px;
+    margin:0 auto;
+    border-collapse:collapse;
+    background: rgba(255,255,255,0.02);
+    border-radius:10px;
+    font-family: monospace;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    overflow:hidden;
+}
+.history-table thead th{
+    text-align:left;
+    padding:12px 14px;
+    font-size:14px;
+    color:#ddd;
+    font-weight:800;
+    background: rgba(0, 0, 0, 0.1);
+}
+.history-table tbody td{
+    padding:12px 14px;
+    border-bottom:1px solid rgba(0, 0, 0, 0.05);
+    color:#cfcfcf;
+    font-size:15px;
+}
+.history-table tbody tr:nth-child(1) td{
+    color:var(--accent);
+    font-weight:900;
+}
+.muted{ color:#9a9a9a; font-weight:600; font-size:13px; text-align:center; }
+
+@media (max-width:800px){
+    .history-table thead th:nth-child(3),
+    .history-table tbody td:nth-child(3){ display:none; }
+    #reaction-time{ font-size:30px; }
+    .light{ width:48px; height:48px; }
+    .edge-anim{ width:90%; height:18px; border-radius:9px; filter:blur(4px); }
+    #chart-canvas{ height:180px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Snow canvas: arka planda sürekli hareket eden beyaz kar taneleri -->
+<canvas id="snow-canvas" aria-hidden="true"></canvas>
+
+<button id="history-button">Zaman Geçmişimiz</button>
+
+<div id="game-area">
+    <div id="lights-container">
+        <!-- Üst/alt kenar animasyon elemanları (HTML aynı kaldı; anim'ler artık viewport top/bottom'ta gösterilir) -->
+        <div class="edge-anim top" aria-hidden="true"><div class="bar"></div></div>
+        <div class="edge-anim bottom" aria-hidden="true"><div class="bar"></div></div>
+
+        <div class="light"></div>
+        <div class="light"></div>
+        <div class="light"></div>
+        <div class="light"></div>
+        <div class="light"></div>
+    </div>
+    <div id="status-display">Yarışa başlamak için tıklayın.</div>
+    <div id="reaction-time">0.000 s</div>
+</div>
+
+<div id="history-page" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="hist-top">
+        <div class="hist-title">🏁 Zaman Geçmişi</div>
+        <div class="hist-actions">
+            <button id="close-history" class="btn ghost">← GERİ</button>
+            <button id="export-button" class="btn primary">Dışa Aktar</button>
+            <button id="clear-button" class="btn danger">Temizle</button>
+        </div>
+    </div>
+    <div id="history-body">
+        <!-- Grafik eklendi -->
+        <div id="chart-wrap" aria-hidden="false">
+            <div class="chart-title">Reaksiyon Süreleri — Çizgi Grafik</div>
+            <div id="chart-canvas" role="img" aria-label="Reaksiyon sürelerini gösteren çizgi grafik (0.290 s noktaları yeşil)."></div>
+        </div>
+
+        <table class="history-table">
+            <thead>
+                <tr><th>#</th><th>Zaman (s)</th><th>Tarih - Saat</th></tr>
+            </thead>
+            <tbody id="history-tbody"></tbody>
+        </table>
+        <div id="no-records" class="muted" style="display:none;">Henüz kaydedilmiş bir reaksiyon süreniz yok.</div>
+    </div>
+</div>
+
+<audio id="light-sound" src="light.mp3" preload="auto"></audio>
+<audio id="go-sound" src="go_sound.mp3" preload="auto"></audio>
+
+<script>
+// ----- KAR TANECİKLERİ (SNOW) -----
+// Bu blok sayfa yüklenir yüklenmez başlar ve arkada nazikçe kayan beyaz tanecikler oluşturur.
+// Canvas z-index:-1 olduğu için sayfadaki diğer elemanlara dokunmaz.
+(function(){
+    const canvas = document.getElementById('snow-canvas');
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let W = 0, H = 0;
+    let particles = [];
+    const PARTICLE_COUNT = Math.round(Math.min(160, Math.max(60, (window.innerWidth * window.innerHeight) / 90000))); // ekranla orantılı
+    const DPR = Math.max(1, window.devicePixelRatio || 1);
+
+    function resize(){
+        W = window.innerWidth;
+        H = window.innerHeight;
+        canvas.width = Math.floor(W * DPR);
+        canvas.height = Math.floor(H * DPR);
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+
+    function rand(min, max){ return Math.random()*(max-min)+min; }
+
+    function createParticles(){
+        particles = [];
+        for(let i=0;i<PARTICLE_COUNT;i++){
+            // x: genişlikte rasgele, y: üstte veya biraz üstünde başlayabilir
+            const size = rand(0.9, 3.8); // daha ince/belli tanecikler
+            const p = {
+                x: rand(0, W),
+                y: rand(-H*0.5, H),
+                r: size,
+                // y hız: küçükten büyüğe (daha doğal için)
+                vy: rand(0.15, 0.9) * (size/1.8), 
+                vx: rand(-0.35, 0.35), // yatay hafif sürüklenme
+                angle: rand(0, Math.PI*2),
+                drift: rand(0.002, 0.01),
+                alpha: rand(0.4, 0.95),
+                sway: rand(8, 38)
+            };
+            particles.push(p);
+        }
+    }
+
+    function draw(){
+        ctx.clearRect(0,0,W,H);
+        // hafif arkaplan haze (çok ince)
+        // ctx.fillStyle = 'rgba(255,255,255,0.01)';
+        // ctx.fillRect(0,0,W,H);
+
+        for(let i=0;i<particles.length;i++){
+            const p = particles[i];
+            // hareket
+            p.y += p.vy;
+            p.x += p.vx + Math.sin(p.angle) * 0.15;
+            p.angle += p.drift;
+
+            // yumuşak salınım
+            const sway = Math.sin(p.angle*0.7) * (p.sway * 0.01);
+            const drawX = p.x + sway;
+            const drawY = p.y;
+
+            // wrap veya reset üstten
+            if(drawY - p.r > H + 8 || drawX < -40 || drawX > W + 40){
+                // yeniden üstten başlat
+                p.x = rand(0, W);
+                p.y = rand(-H*0.3, -8);
+                p.vy = rand(0.15, 0.9) * (p.r/1.8);
+                p.vx = rand(-0.35, 0.35);
+                p.alpha = rand(0.4, 0.98);
+                p.angle = rand(0, Math.PI*2);
+            }
+
+            // çizim: yumuşak parlaklığın iç halkası
+            const g = ctx.createRadialGradient(drawX, drawY, 0, drawX, drawY, Math.max(8, p.r*6));
+            g.addColorStop(0, `rgba(255,255,255,${Math.min(1,p.alpha)})`);
+            g.addColorStop(0.25, `rgba(255,255,255,${(p.alpha*0.6).toFixed(3)})`);
+            g.addColorStop(1, `rgba(255,255,255,0)`);
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(drawX, drawY, Math.max(3, p.r*4), 0, Math.PI*2);
+            ctx.fill();
+
+            // küçük merkez noktası (daha belirgin)
+            ctx.fillStyle = `rgba(255,255,255,${Math.min(1, p.alpha)})`;
+            ctx.beginPath();
+            ctx.arc(drawX, drawY, Math.max(0.6, p.r*0.6), 0, Math.PI*2);
+            ctx.fill();
+        }
+    }
+
+    let rafId = null;
+    function loop(){
+        draw();
+        rafId = requestAnimationFrame(loop);
+    }
+
+    // başlat
+    function start(){
+        cancelAnimationFrame(rafId);
+        resize();
+        createParticles();
+        loop();
+    }
+
+    window.addEventListener('resize', ()=>{ resize(); });
+
+    // hemen başlat
+    start();
+
+    // temizleme (sayfa kapandığında)
+    window.addEventListener('unload', ()=>{ cancelAnimationFrame(rafId); });
+})();
+// ----- /SNOW -----
+
+
+
+// Oyun ve history değişkenleri
+const lights=document.querySelectorAll('.light');
+const statusDisplay=document.getElementById('status-display');
+const reactionTimeDisplay=document.getElementById('reaction-time');
+
+const historyButton=document.getElementById('history-button');
+const historyPage=document.getElementById('history-page');
+const closeHistory=document.getElementById('close-history');
+const exportButton=document.getElementById('export-button');
+const clearButton=document.getElementById('clear-button');
+const historyTbody=document.getElementById('history-tbody');
+const noRecords=document.getElementById('no-records');
+
+const chartCanvasWrap = document.getElementById('chart-canvas');
+
+const edgeTop = document.querySelector('.edge-anim.top');
+const edgeBottom = document.querySelector('.edge-anim.bottom');
+
+let state='ready';
+let startTime=0;
+let lightsOutTimeout=null;
+let reactionHistory=[];
+
+// audio
+const lightSound=document.getElementById('light-sound');
+const goSound=document.getElementById('go-sound');
+
+function uid(){ return 'id'+Math.random().toString(36).slice(2,9); }
+function fmtDate(iso){ const d=new Date(iso); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
+
+function loadHistory(){
+    const raw=localStorage.getItem('f1ReactionHistory');
+    if(!raw){ reactionHistory=[]; return; }
+    try{
+        const parsed=JSON.parse(raw);
+        reactionHistory=parsed.map(item=>{
+            if(typeof item === 'number') return { time: Number(item), date: new Date().toISOString(), id: uid() };
+            return { time: Number(item.time||item), date: item.date||new Date().toISOString(), id: item.id||uid() };
+        });
+        reactionHistory.sort((a,b)=>a.time-b.time);
+        if(reactionHistory.length>150) reactionHistory = reactionHistory.slice(0,150);
+    }catch(e){ reactionHistory=[]; }
+}
+function persistHistory(){ localStorage.setItem('f1ReactionHistory', JSON.stringify(reactionHistory)); }
+
+function renderHistoryTable(){
+    historyTbody.innerHTML='';
+    if(reactionHistory.length===0){ noRecords.style.display='block'; chartCanvasWrap.innerHTML=''; return; }
+    else noRecords.style.display='none';
+    reactionHistory.forEach((rec,i)=>{
+        const tr=document.createElement('tr');
+        const tdRank=document.createElement('td');
+        tdRank.textContent=i===0?'':(i+1); tdRank.style.fontWeight=i===0?'900':'700';
+        const tdTime=document.createElement('td'); tdTime.textContent=rec.time.toFixed(3);
+        const tdDate=document.createElement('td'); tdDate.textContent=fmtDate(rec.date);
+        tr.appendChild(tdRank); tr.appendChild(tdTime); tr.appendChild(tdDate);
+        historyTbody.appendChild(tr);
+    });
+
+    // grafiği yeniden çiz
+    renderChart();
+}
+
+function openHistory(){ renderHistoryTable(); historyPage.classList.add('active'); historyPage.setAttribute('aria-hidden','false'); historyPage.scrollTop=0; setTimeout(()=>closeHistory.focus(),50); }
+function closeHistoryPage(){ historyPage.classList.remove('active'); historyPage.setAttribute('aria-hidden','true'); }
+
+function exportHistory(){
+    if(reactionHistory.length===0){ alert('Dışa aktarılacak kayıt yok.'); return; }
+    const text=reactionHistory.map((r,i)=>`${i===0?'🥇 EN İYİ':`#${i+1}`}: ${r.time.toFixed(3)} s — ${fmtDate(r.date)}`).join('\n');
+    navigator.clipboard?.writeText(text).then(()=>alert('Geçmiş panoya kopyalandı.'), ()=>alert('Panoya kopyalanamadı, tarayıcı izinlerini kontrol et.'));
+}
+function clearHistory(){ if(confirm('Geçmişi tamamen silmek istediğinize emin misiniz?')){ reactionHistory=[]; persistHistory(); renderHistoryTable(); }}
+
+// Kenar animasyonunu tetikleyen yardımcı fonksiyon
+function playEdgeAnim(){
+    // top
+    if(!edgeTop || !edgeBottom) return;
+    // remove so animation can restart
+    edgeTop.classList.remove('animate');
+    edgeBottom.classList.remove('animate');
+    // force reflow to restart animation
+    // eslint-disable-next-line no-unused-expressions
+    void edgeTop.offsetWidth;
+    // add top first (comes from below towards top)
+    edgeTop.classList.add('animate');
+    // small delay for bottom for a subtle offset (bottom comes from above towards bottom)
+    setTimeout(()=>{ 
+        edgeBottom.classList.add('animate'); 
+    }, 40);
+}
+
+// Oyun işlemleri
+document.body.addEventListener('click', handleClick);
+document.body.addEventListener('touchstart', handleClick,{passive:false});
+
+function resetGame(){ lights.forEach(l=>l.classList.remove('on')); statusDisplay.textContent='Yarışa başlamak için tıklayın.'; reactionTimeDisplay.textContent='0.000 s'; state='ready'; clearTimeout(lightsOutTimeout); }
+
+function safePlay(audio){
+    if(!audio) return;
+    try{ audio.currentTime = 0; audio.play().catch(()=>{}); }catch(e){}
+}
+
+function handleClick(e){
+    if(e.type==='touchstart') e.preventDefault();
+    if(historyPage.classList.contains('active')) return;
+    if(e.target===historyButton || historyButton.contains(e.target)) return;
+    if(state==='ready'){ startSequence(); }
+    else if(state==='waiting'){
+        clearTimeout(lightsOutTimeout); lights.forEach(l=>l.classList.add('on'));
+        statusDisplay.textContent='HATA! Çok erken başladınız.'; reactionTimeDisplay.textContent='Çok Erken'; state='complete';
+        safePlay(goSound);
+        // erken basmada da kenar animi göster
+        playEdgeAnim();
+    }else if(state==='running'){
+        const stop=performance.now();
+        const reaction=(stop-startTime)/1000;
+        reactionHistory.push({time:Number(reaction), date:new Date().toISOString(), id:uid()});
+        reactionHistory.sort((a,b)=>a.time-b.time);
+        if(reactionHistory.length>150) reactionHistory=reactionHistory.slice(0,150);
+        persistHistory();
+        statusDisplay.textContent='REAKSİYON SÜRENİZ:'; reactionTimeDisplay.textContent=reaction.toFixed(3)+' s'; state='complete';
+        renderHistoryTable();
+        safePlay(goSound);
+    }else if(state==='complete'){ resetGame(); }
+}
+
+function startSequence(){
+    state='waiting'; statusDisplay.textContent='BEKLEYİN...'; reactionTimeDisplay.textContent='0.000 s'; lights.forEach(l=>l.classList.remove('on'));
+    let idx=0; const interval=900;
+    function next(){
+        if(idx<lights.length){
+            lights[idx].classList.add('on');
+            safePlay(lightSound);
+            // her ışık yandığında kenar animasyonunu tetikle
+            playEdgeAnim();
+            idx++; setTimeout(next,interval);
+        } else {
+            lightsOutTimeout=setTimeout(lightsOut, Math.random()*2500 + 1000);
+        }
+    }
+    next();
+}
+function lightsOut(){
+    lights.forEach(l=>l.classList.remove('on'));
+    statusDisplay.textContent='GİT! 🚦'; state='running'; startTime=performance.now();
+    safePlay(goSound);
+    // bütün ışıklar sönerken kısa kenar animi
+    playEdgeAnim();
+}
+
+// GRAFİK RENDER FONKSİYONU
+function renderChart(){
+    // chartCanvasWrap içine SVG koyuyoruz
+    chartCanvasWrap.innerHTML = ''; // önce temizle
+
+    if(!reactionHistory || reactionHistory.length === 0) return;
+
+    // boyutlar
+    const padding = { left: 40, right: 12, top: 12, bottom: 28 };
+    const containerWidth = Math.min(1100, chartCanvasWrap.clientWidth || 1000);
+    const containerHeight = Math.max(140, chartCanvasWrap.clientHeight || 300);
+    const width = containerWidth;
+    const height = containerHeight;
+
+    // veriler: sıralı reactionHistory (zaten sortlanıyor)
+    const data = reactionHistory.map(r => Number(r.time));
+    const n = data.length;
+
+    // min/max (küçük varyasyon için biraz marj bırak)
+    let minY = Math.min(...data);
+    let maxY = Math.max(...data);
+    // y aralığını rahat göstermek için küçük padding
+    if (minY === maxY) {
+        minY = Math.max(0, minY - 0.05);
+        maxY = maxY + 0.05;
+    } else {
+        const pad = (maxY - minY) * 0.12;
+        minY = Math.max(0, minY - pad);
+        maxY = maxY + pad;
+    }
+
+    // scale fonksiyonları
+    const xForIndex = i => {
+        if (n === 1) return padding.left + (width - padding.left - padding.right) / 2;
+        const availableW = width - padding.left - padding.right;
+        return padding.left + (i / (n - 1)) * availableW;
+    };
+    const yForValue = v => {
+        const availableH = height - padding.top - padding.bottom;
+        // invert y (SVG y artınca aşağı)
+        return padding.top + (1 - (v - minY) / (maxY - minY)) * availableH;
+    };
+
+    const svgns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgns, 'svg');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+    // arka grid yatay çizgileri (3-5 çizgi)
+    const gridGroup = document.createElementNS(svgns, 'g');
+    gridGroup.setAttribute('stroke', 'var(--chart-grid)');
+    gridGroup.setAttribute('stroke-width', '1');
+    gridGroup.setAttribute('opacity', '0.7');
+    const gridLines = 4;
+    for (let i = 0; i <= gridLines; i++){
+        const y = padding.top + i * ( (height - padding.top - padding.bottom) / gridLines );
+        const line = document.createElementNS(svgns, 'line');
+        line.setAttribute('x1', padding.left);
+        line.setAttribute('x2', width - padding.right);
+        line.setAttribute('y1', y);
+        line.setAttribute('y2', y);
+        line.setAttribute('stroke-linecap', 'round');
+        gridGroup.appendChild(line);
+
+        // y etiketi (solda)
+        const tickVal = ( (1 - i / gridLines) * (maxY - minY) + minY );
+        const text = document.createElementNS(svgns, 'text');
+        text.setAttribute('x', Math.max(6, padding.left - 6));
+        text.setAttribute('y', y + 4);
+        text.setAttribute('font-size', '10');
+        text.setAttribute('fill', '#bfbfbf');
+        text.setAttribute('text-anchor', 'end');
+        text.textContent = tickVal.toFixed(3);
+        gridGroup.appendChild(text);
+    }
+    svg.appendChild(gridGroup);
+
+    // çizgi path
+    const pathGroup = document.createElementNS(svgns, 'g');
+    pathGroup.setAttribute('fill', 'none');
+    const polyPoints = data.map((v, i) => `${xForIndex(i)},${yForValue(v)}`).join(' ');
+    const poly = document.createElementNS(svgns, 'polyline');
+    poly.setAttribute('points', polyPoints);
+    poly.setAttribute('stroke', 'var(--accent)');
+    poly.setAttribute('stroke-width', '2');
+    poly.setAttribute('stroke-linejoin', 'round');
+    poly.setAttribute('stroke-linecap', 'round');
+    poly.setAttribute('fill', 'none');
+    poly.setAttribute('opacity', '0.95');
+    pathGroup.appendChild(poly);
+
+    // hafif dolgu altındaki alan (yarı saydam)
+    const areaPath = document.createElementNS(svgns, 'path');
+    const areaPoints = data.map((v,i) => `${xForIndex(i)},${yForValue(v)}`).join(' ');
+    const areaD = `M ${padding.left} ${height - padding.bottom} L ${areaPoints} L ${width - padding.right} ${height - padding.bottom} Z`;
+    areaPath.setAttribute('d', areaD);
+    areaPath.setAttribute('fill', 'rgba(255,0,0,0.06)');
+    areaPath.setAttribute('stroke', 'none');
+    pathGroup.appendChild(areaPath);
+
+    svg.appendChild(pathGroup);
+
+    // noktalar (markers)
+    const markersGroup = document.createElementNS(svgns, 'g');
+    markersGroup.setAttribute('stroke', '#000');
+    markersGroup.setAttribute('stroke-width', '0.6');
+    data.forEach((v,i) => {
+        const x = xForIndex(i);
+        const y = yForValue(v);
+
+        // özel koşul: 0.290 olanları yeşil yap (küçük epsilon ile karşılaştır)
+        const epsilon = 0.0005;
+        const isTarget = Math.abs(v - 0.290) <= epsilon;
+
+        // nokta arka dairesi (glow)
+        const glow = document.createElementNS(svgns, 'circle');
+        glow.setAttribute('cx', x);
+        glow.setAttribute('cy', y);
+        glow.setAttribute('r', isTarget ? 7.5 : 5.5);
+        glow.setAttribute('fill', isTarget ? 'rgba(40,167,69,0.14)' : 'rgba(255,0,0,0.06)');
+        glow.setAttribute('stroke', 'none');
+        markersGroup.appendChild(glow);
+
+        // ana nokta
+        const c = document.createElementNS(svgns, 'circle');
+        c.setAttribute('cx', x);
+        c.setAttribute('cy', y);
+        c.setAttribute('r', isTarget ? 4.5 : 3.5);
+        c.setAttribute('fill', isTarget ? '#28a745' : '#ffffff');
+        c.setAttribute('opacity', '0.98');
+        c.setAttribute('stroke', isTarget ? '#0f6b2f' : 'rgba(0,0,0,0.4)');
+        c.setAttribute('stroke-width', isTarget ? '0.9' : '0.6');
+        c.setAttribute('data-idx', i);
+        markersGroup.appendChild(c);
+
+        // tooltip-like küçük label (isteğe bağlı) - hover gösterimi handled via title
+        const title = document.createElementNS(svgns, 'title');
+        title.textContent = `#${i+1} — ${v.toFixed(3)} s`;
+        c.appendChild(title);
+    });
+    svg.appendChild(markersGroup);
+
+    // x ekseni için etiketler (baş ve son ve ortalama)
+    const xAxisGroup = document.createElementNS(svgns, 'g');
+    xAxisGroup.setAttribute('font-size', '11');
+    xAxisGroup.setAttribute('fill', '#bfbfbf');
+    // Baş
+    const tStart = document.createElementNS(svgns, 'text');
+    tStart.setAttribute('x', padding.left);
+    tStart.setAttribute('y', height - 6);
+    tStart.setAttribute('text-anchor', 'start');
+    tStart.textContent = reactionHistory.length ? `1` : '';
+    xAxisGroup.appendChild(tStart);
+    // Ort
+    const tMid = document.createElementNS(svgns, 'text');
+    tMid.setAttribute('x', width / 2);
+    tMid.setAttribute('y', height - 6);
+    tMid.setAttribute('text-anchor', 'middle');
+    tMid.textContent = reactionHistory.length ? `${Math.ceil(reactionHistory.length/2)}` : '';
+    xAxisGroup.appendChild(tMid);
+    // Son
+    const tEnd = document.createElementNS(svgns, 'text');
+    tEnd.setAttribute('x', width - padding.right);
+    tEnd.setAttribute('y', height - 6);
+    tEnd.setAttribute('text-anchor', 'end');
+    tEnd.textContent = reactionHistory.length ? `${reactionHistory.length}` : '';
+    xAxisGroup.appendChild(tEnd);
+
+    svg.appendChild(xAxisGroup);
+
+    // üst başlık (küçük açıklama)
+    const caption = document.createElementNS(svgns, 'text');
+    caption.setAttribute('x', padding.left + 6);
+    caption.setAttribute('y', padding.top + 12);
+    caption.setAttribute('font-size', '12');
+    caption.setAttribute('fill', '#ddd');
+    caption.textContent = 'Yeşil: 0.290 s kayıtları';
+    svg.appendChild(caption);
+
+    chartCanvasWrap.appendChild(svg);
+}
+
+/* Basit debounce: pencere boyutu değiştiğinde grafiği yeniden çiz */
+let resizeTimer = null;
+window.addEventListener('resize', ()=>{ clearTimeout(resizeTimer); resizeTimer = setTimeout(()=>{ renderChart(); }, 120); });
+
+// Event listenerler
+historyButton.addEventListener('click',(e)=>{ e.stopPropagation(); loadHistory(); renderHistoryTable(); openHistory(); });
+closeHistory.addEventListener('click',(e)=>{ e.stopPropagation(); closeHistoryPage(); });
+exportButton.addEventListener('click',(e)=>{ e.stopPropagation(); exportHistory(); });
+clearButton.addEventListener('click',(e)=>{ e.stopPropagation(); clearHistory(); });
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && historyPage.classList.contains('active')) closeHistoryPage(); });
+
+// init
+loadHistory();
+resetGame();
+renderHistoryTable();
+</script>
+</body>
+</html>
